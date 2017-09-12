@@ -17,55 +17,64 @@ export default class WalletService {
   stop(callback) {
     setImmediate(callback);
   }
-  setupRoutes(app, express) { 
-    app.get('/get_new_wallet', (req, res, next) => { 
+  setupRoutes(app, express) {
+    app.get('/get_new_wallet', (req, res, next) => {
       let name = 'Irene';
 
       client.createWallet("My Wallet", name, 2, 2, {network: 'testnet'}, function(err, secret) {
         if (err) {
-          console.log('error: ',err);
+          console.error('error: ',err);
           return;
         };
         console.log('Wallet Created. Share this secret with your copayers: ' + secret);
         fs.writeFileSync('./' + name + '.dat', client.export());
-      	res.status(200).send(secret);
+        res.status(200).send(secret);
       });
     });
 
     app.get('/open_wallet', (req, res, next) => {
       let text = fs.readFileSync('Irene.dat','utf8')
+      let json = JSON.parse(text);
 
-      client.import(text);
+      try {
+        client.import(text);
+      } catch (e) {
+        console.error('Corrupt wallet file - ', e);
+      };
 
-      client.openWallet((error, result) => {
-        console.log(error);
-        console.log(result);
-	res.send(result);
+      client.openWallet((err, returnValue) => {
+        if (err) throw err;
+        res.send(returnValue);
       });
-    });
+    }
 
-    app.get('/get_new_address', (req, res, next) => { 
+    app.get('/get_new_address', (req, res, next) => {
       let text = fs.readFileSync('Irene.dat','utf8')
-	      console.log('-'.repeat(100))
-      console.log (text)
       client.import(text);
 
-      client.openWallet((error, result) => {
-	      console.log('-'.repeat(100))
-        console.error(error);
-        console.log(result);
+      try {
+        client.import(text);
+      } catch (e) {
+        console.error('Corrupt wallet file - ', e);
+      };
 
-        client.createAddress({}, (err, address) => {
-		console.error(err);
-	      console.log('-'.repeat(100))
-		      console.log('created')
-	  console.log(address);
-      	  res.status(200).send(address);
-        });
+      client.openWallet((error, result) => {
+        if (result.wallet.status == 'complete') {
+          client.createAddress({}, (err, addr) => {
+            if (err) {
+              console.log('error: ', err);
+              return;
+            };
+            res.send(addr);
+            console.log('\nReturn:', addr)
+          });
+        } else {
+          console.error('nope didnt work')
+        }
       });
     });
   }
-  getRoutePrefix() { 
+  getRoutePrefix() {
     return 'wallet-service';
   }
   getAPIMethods() {
